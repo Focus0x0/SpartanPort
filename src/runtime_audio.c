@@ -14,6 +14,7 @@
 #include <pthread.h>
 #include <time.h>
 #include <SDL3/SDL.h>
+#include <math.h>
 
 #define PORTS 25
 #define ERR_NOT_OPENED ((int32_t)0x80260001)
