@@ -111,11 +111,30 @@ static Port *port_of(int32_t handle, int32_t *error) {
     if (!ports[id].used) { *error=ERR_NOT_OPENED; return NULL; }
     return &ports[id];
 }
+static float _gain = 1.0f;
 
+static float get_audio_gain(void)
+{
+    const char *env = getenv("GOW3_AUDIO_GAIN");
+    if (env == NULL || *env == '\0')
+        return 1.0f;
+
+    char *end = NULL;
+    errno = 0;
+    float gain = strtof(env, &end);
+
+    if (errno != 0 || end == env || *end != '\0' ||
+        !isfinite(gain) || gain < 0.0f || gain > 10.0f) {
+        return 1.0f;
+    }
+    _gain = gain;
+    return gain;
+}
 static ABI int32_t audio_init(void) {
     pthread_mutex_lock(&table_lock);
     int32_t r=initialized ? ERR_ALREADY_INIT : 0;
     initialized=1;
+    get_audio_gain();
     pthread_mutex_unlock(&table_lock);
     return r;
 }
@@ -241,6 +260,8 @@ static int32_t output_port(int32_t handle, const void *data, int pace) {
             int target=p->channels==8 && !p->std_layout ? remap[c] : c;
             size_t from=f*(size_t)p->channels+(size_t)c, to=f*(size_t)p->channels+(size_t)target;
             float gain=(float)p->volume[c]/VOLUME_0DB*(p->type==4 ? PAD_SPEAKER_GAIN : 1.0f);
+            float gain1 = gain*_gain;
+            gain = gain1;
             if (p->is_float) { float v; memcpy(&v,(const char *)data+from*4,4); v*=gain; memcpy(converted+to*4,&v,4); }
             else { int16_t v; memcpy(&v,(const char *)data+from*2,2); v=(int16_t)((float)v*gain); memcpy(converted+to*2,&v,2); }
         }
